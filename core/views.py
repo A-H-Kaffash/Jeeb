@@ -2,9 +2,12 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.db import transaction
+from django.db import IntegrityError
 from django.utils import timezone
 from datetime import datetime
 from decimal import Decimal
+from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
 from .models import Token, Transaction, Account, Category
 
 
@@ -76,3 +79,48 @@ def submit_transaction(request):
 
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+@csrf_exempt
+def register_user(request):
+    if request.method != "POST":
+        return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
+
+    username = request.POST.get('username')
+    email = request.POST.get('email')
+    password = request.POST.get('password')
+
+    if not all([username, email, password]):
+        return JsonResponse({'status': 'error', 'message': 'Missing required fields'}, status=400)
+
+    try:
+        user = User.objects.create_user(username=username, email=email, password=password)
+
+        return JsonResponse({'status': 'success', 'message': f'User {user.username} with Email {user.email} created.'})
+
+    except IntegrityError:
+        return JsonResponse({'status': 'error', 'message': 'User already exists'}, status=409)
+
+def login_user(request):
+
+    if request.method != "POST":
+        return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
+
+    username = request.POST.get('username')
+    password = request.POST.get('password')
+
+    if not all([username, password]):
+        return JsonResponse({'status': 'error', 'message': 'Missing required fields'}, status=400)
+
+    user = authenticate(username=username, password=password)
+
+    if not user:
+        try:
+            token = Token.objects.get(user=user)
+            return JsonResponse({'status': 'success', 'token': token.string})
+
+        except Token.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'User token not found '}, status=500)
+
+    else:
+        return JsonResponse({'status': 'error', 'message': 'Wrong username or password'}, status=409)
