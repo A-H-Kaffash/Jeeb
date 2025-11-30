@@ -101,6 +101,7 @@ def register_user(request):
     except IntegrityError:
         return JsonResponse({'status': 'error', 'message': 'User already exists'}, status=409)
 
+@csrf_exempt
 def login_user(request):
 
     if request.method != "POST":
@@ -114,7 +115,7 @@ def login_user(request):
 
     user = authenticate(username=username, password=password)
 
-    if not user:
+    if user:
         try:
             token = Token.objects.get(user=user)
             return JsonResponse({'status': 'success', 'token': token.string})
